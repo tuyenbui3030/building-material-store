@@ -1,24 +1,48 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const multer = require("multer");
 
 const { Product } = require("../models/product");
 const { Category } = require("../models/category");
 
 const router = express.Router();
 
-// http://localhost:3000/api/products
+const FILE_TYPE_MAP = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/jpg": "jpg",
+};
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const isValid = FILE_TYPE_MAP[file.mimetype];
+    let uploadError = new Error("Hình ảnh không hợp lệ!");
+
+    if (isValid) {
+      uploadError = null;
+    }
+    cb(uploadError, "src/public/uploads");
+  },
+  filename: function (req, file, cb) {
+    const fileName = file.originalname.split(" ").join("-");
+    const extension = FILE_TYPE_MAP[file.mimetype];
+    cb(null, `${fileName}-${Date.now()}.${extension}`);
+  },
+});
+
+const uploadOptions = multer({ storage: storage });
+
 router.get("/", async (req, res) => {
   let filter = {};
-    if(req.query.categories)
-    {
-         filter = {category: req.query.categories.split(',')}
-    }
+  if (req.query.categories) {
+    filter = { category: req.query.categories.split(",") };
+  }
 
-    const productList = await Product.find(filter).populate('category');
+  const productList = await Product.find(filter).populate("category");
 
-    if(!productList) {
-        res.status(500).json({success: false})
-    } 
+  if (!productList) {
+    res.status(500).json({ success: false });
+  }
   res.json(productList);
 });
 
@@ -35,9 +59,14 @@ router.get(`/:id`, async (req, res) => {
   res.json(product);
 });
 
-router.post("/", async (req, res) => {
-  const { name, photo, category, originPrice, sellingPrice, countInStock } =
-    req.body;
+router.post("/", uploadOptions.single("photo"), async (req, res) => {
+  const { name, category, originPrice, sellingPrice, countInStock } = req.body;
+
+  const file = req.file;
+  if (!file) return res.status(400).send("Thiếu hình ảnh sản phẩm");
+
+  const fileName = file.filename;
+  const basePath = `${req.protocol}://${req.get("host")}/public/uploads/`;
 
   const checkCat = await Category.findById(category);
   if (!checkCat)
@@ -45,7 +74,7 @@ router.post("/", async (req, res) => {
 
   let product = new Product({
     name,
-    photo,
+    photo: `${basePath}${fileName}`,
     category,
     originPrice,
     sellingPrice,
@@ -107,15 +136,15 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-router.get(`/get/count`, async (req, res) =>{
-  const productCount = await Product.countDocuments((count) => count)
+router.get(`/get/count`, async (req, res) => {
+  const productCount = await Product.countDocuments((count) => count);
 
-  if(!productCount) {
-      res.status(500).json({success: false})
-  } 
+  if (!productCount) {
+    res.status(500).json({ success: false });
+  }
   res.json({
-      productCount: productCount
+    productCount: productCount,
   });
-})
+});
 
 module.exports = router;

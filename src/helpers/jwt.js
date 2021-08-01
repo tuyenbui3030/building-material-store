@@ -9,7 +9,11 @@ function authJwt() {
     algorithms: ["HS256"],
     isRevoked: isRevoked,
   }).unless({
-    path: [`${api}/users/login`, `${api}/users/register`],
+    path: [
+      `${api}/users/login`,
+      `${api}/users/register`,
+      { url: /\/public\/uploads(.*)/, methods: ["GET", "OPTIONS"] },
+    ],
   });
 }
 async function isRevoked(req, payload, done) {
