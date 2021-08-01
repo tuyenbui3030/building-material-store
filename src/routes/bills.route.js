@@ -9,7 +9,11 @@ const router = express.Router();
 router.get(`/`, async (req, res) => {
   const orderList = await Bill.find()
     .populate("user", "name")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .populate({ 
+      path: 'detailItems', populate: {
+          path : 'product', populate: 'category'} 
+      });;
 
   if (!orderList) {
     res.status(500).json({ success: false });
@@ -72,5 +76,6 @@ router.post("/", async (req, res) => {
 
   res.send(bill);
 });
+
 
 module.exports = router;

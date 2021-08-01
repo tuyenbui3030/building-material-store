@@ -4,6 +4,7 @@ const multer = require("multer");
 
 const { Product } = require("../models/product");
 const { Category } = require("../models/category");
+const { Receive } = require("../models/receive");
 
 const router = express.Router();
 
@@ -116,6 +117,66 @@ router.put("/:id", async (req, res) => {
   res.json(product);
 });
 
+//Nhập kho
+router.patch("/receive/create", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.body.product)) {
+    return res.status(400).send("Mã sản phẩm không hợp lệ");
+  }
+
+  const product = await Product.findByIdAndUpdate(
+    req.body.product,
+    { $inc: { countInStock: req.body.quantity } },
+    { new: true }
+  );
+
+  let receive = new Receive({
+    product: product._id,
+    quantity: req.body.quantity,
+  });
+
+  receive = await receive.save();
+
+  if (!product) return res.status(500).send("Không cập nhật được sản phẩm");
+
+  res.json(product);
+});
+
+//Chỉnh sửa số lượng nhập kho
+router.patch("/receive/:id/edit", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send("Mã đơn nhập kho không hợp lệ");
+  }
+
+  const receive = await Receive.findByIdAndUpdate(req.params.id, {
+    quantity: req.body.quantity,
+  }).populate({path: "product", select: "_id name"});
+
+  if (!receive) return res.status(500).send("Mã đơn nhập không tồn tại");
+
+  const newCountInStock = req.body.quantity - receive.quantity;
+
+  const product = await Product.findByIdAndUpdate(
+    receive.product._id,
+    { $inc: { countInStock: newCountInStock } },
+    { new: true }
+  );
+
+  if (!product) return res.status(500).send("Mã sản phẩm không tồn tại");
+
+  res.json(receive);
+});
+
+//Lấy danh sách nhập kho
+router.get("/receive", async (req, res) => {
+  const receiveList = await Receive.find().populate("product");
+
+  if (!receiveList) {
+    res.status(500).json({ success: false });
+  }
+  res.json(receiveList);
+});
+
+//Xóa sản phẩm
 router.delete("/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
